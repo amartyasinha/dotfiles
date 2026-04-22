@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+    cat <<'EOF'
+Usage:
+  git-remote-setup <github-owner> <remote-name> [repo-dir]
+
+Description:
+  Helper to quickly set up and maintain multiple git remotes (e.g. fork/origin + upstream).
+
+Arguments:
+  github-owner   GitHub user/org to use for the selected remote URL.
+  remote-name    Remote to configure to <github-owner>/<repo>.
+                 - origin: special mode; set origin to <github-owner>/<repo>;
+                           if upstream is missing and origin exists, bootstrap upstream from origin.
+                 - any other name: set/add that remote to <github-owner>/<repo>.
+  repo-dir       Optional local git repo directory. Defaults to current directory.
+                 This script expects remote 'origin' to exist.
+
+Examples:
+  # Cloned from fork; add original org as upstream
+  git-remote-setup openstack-k8s-operators upstream
+
+  # Cloned from original; switch origin to your fork and keep original as upstream
+  git-remote-setup amartyasinha origin /path/to/repo
+
+  # Add/update another remote name
+  git-remote-setup openstack-k8s-operators source
+EOF
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    usage
+    exit 0
+fi
+
+if [[ $# -lt 2 || $# -gt 3 ]]; then
+    usage
+    exit 1
+fi
+
+github_owner="$1"
+remote_name="$2"
+repo_dir="${3:-.}"
+
+if [[ ! -d "$repo_dir" ]]; then
+    echo "Error: repo-dir not found: $repo_dir" >&2
+    exit 1
+fi
+
+pushd "$repo_dir" >/dev/null
+trap 'popd >/dev/null || true' EXIT
+
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "Error: '$repo_dir' is not a git repository" >&2
+    exit 1
+fi
+
+if ! origin_url="$(git remote get-url origin 2>/dev/null)"; then
+    echo "Error: remote 'origin' not found" >&2
+    exit 1
+fi
+
+# Keep host/protocol style from current origin URL.
+case "$origin_url" in
+    git@*:*/*)
+        url_style="ssh"
+        host="${origin_url#git@}"
+        host="${host%%:*}"
+        path_part="${origin_url#*:}"
+        repo_name="${path_part#*/}"
+        repo_name="${repo_name%.git}"
+        ;;
+    http://*/*/*|https://*/*/*)
+        url_style="https"
+        scheme="${origin_url%%://*}"
+        host_and_path="${origin_url#*://}"
+        host="${host_and_path%%/*}"
+        path_part="${host_and_path#*/}"
+        repo_name="${path_part#*/}"
+        repo_name="${repo_name%.git}"
+        ;;
+    *)
+        echo "Error: unsupported origin URL format: $origin_url" >&2
+        exit 1
+        ;;
+esac
+
+repo_url_for_owner() {
+    local owner="$1"
+    if [[ "$url_style" == "ssh" ]]; then
+        printf '%s\n' "git@${host}:${owner}/${repo_name}.git"
+    else
+        printf '%s\n' "${scheme}://${host}/${owner}/${repo_name}.git"
+    fi
+}
+
+set_remote_url() {
+    local name="$1"
+    local url="$2"
+    if git remote get-url "$name" >/dev/null 2>&1; then
+        git remote set-url "$name" "$url"
+    else
+        git remote add "$name" "$url"
+    fi
+}
+
+if [[ "$remote_name" == "origin" ]]; then
+    # In origin mode, protect existing upstream. Bootstrap only if missing.
+    if ! git remote get-url upstream >/dev/null 2>&1; then
+        set_remote_url "upstream" "$origin_url"
+    fi
+    set_remote_url "origin" "$(repo_url_for_owner "$github_owner")"
+else
+    set_remote_url "$remote_name" "$(repo_url_for_owner "$github_owner")"
+fi
+
+if git remote get-url upstream >/dev/null 2>&1; then
+    git fetch upstream --prune
+    if ! git show-ref --verify --quiet refs/remotes/upstream/main; then
+        # Try fetching upstream/main explicitly when local refs are missing.
+        git fetch upstream main:refs/remotes/upstream/main >/dev/null 2>&1 || true
+    fi
+
+    if git show-ref --verify --quiet refs/remotes/upstream/main; then
+        if git show-ref --verify --quiet refs/heads/main; then
+            git branch --set-upstream-to=upstream/main main
+        else
+            git branch --track main upstream/main
+        fi
+    else
+        echo "Warning: upstream/main not found; skipped main upstream tracking." >&2
+    fi
+else
+    echo "Warning: remote 'upstream' not configured; skipped main upstream tracking." >&2
+fi
+
+echo "Remote setup complete."
+git remote -v
