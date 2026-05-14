@@ -35,8 +35,6 @@ ln -s ~/.dotfiles/nvim ~/.config/nvim
 # Install Go language server
 go install golang.org/x/tools/gopls@latest
 
-# Install Python debugger
-python3 -m pip install --user debugpy
 
 # Install prettier for formatting
 npm install -g prettier
