@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Check if running on macOS
+if [[ "$OSTYPE" != "darwin"* ]]; then
+  echo "This script is only for macOS."
+  exit 1
+fi
+
 if ! command -v brew >/dev/null 2>&1; then
   echo "Homebrew not found. Installing Homebrew..."
   NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
