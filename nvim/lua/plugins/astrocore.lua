@@ -59,6 +59,9 @@ return {
       n = {
         -- second key is the lefthand side of the map
 
+        ["<Leader>e"] = { "<cmd>NvimTreeToggle<cr>", desc = "Toggle file explorer" },
+        ["<Leader>o"] = { "<cmd>NvimTreeFocus<cr>", desc = "Focus file explorer" },
+
         -- navigate buffer tabs
         ["]b"] = { function() require("astrocore.buffer").nav(vim.v.count1) end, desc = "Next buffer" },
         ["[b"] = { function() require("astrocore.buffer").nav(-vim.v.count1) end, desc = "Previous buffer" },

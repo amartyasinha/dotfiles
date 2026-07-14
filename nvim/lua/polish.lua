@@ -1,9 +1,9 @@
--- Open Neo-tree on startup when no file is given
+-- Open nvim-tree on startup when no file is given
 vim.api.nvim_create_autocmd("VimEnter", {
-  desc = "Open Neo-tree on startup",
+  desc = "Open nvim-tree on startup",
   callback = function()
     if vim.fn.argc() == 0 then
-      require("neo-tree.command").execute({ action = "show" })
+      require("nvim-tree.api").tree.open()
     end
   end,
 })
