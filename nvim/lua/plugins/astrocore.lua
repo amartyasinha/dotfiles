@@ -80,6 +80,8 @@ return {
         -- this is useful for naming menus
         -- ["<Leader>b"] = { desc = "Buffers" },
 
+        ["<Leader>gb"] = { function() require("gitsigns").toggle_current_line_blame() end, desc = "Toggle inline git blame" },
+
         -- setting a mapping to false will disable it
         -- ["<C-S>"] = false,
       },

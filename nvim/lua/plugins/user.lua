@@ -1,4 +1,3 @@
-
 -- You can also add or configure plugins by creating files in this `plugins/` folder
 -- PLEASE REMOVE THE EXAMPLES YOU HAVE NO INTEREST IN BEFORE ENABLING THIS FILE
 -- Here are some examples:
@@ -7,7 +6,6 @@
 return {
 
   -- == Examples of Adding Plugins ==
-
 
   {
     "ray-x/lsp_signature.nvim",
@@ -38,6 +36,20 @@ return {
           }, "\n"),
         },
       },
+    },
+  },
+
+  -- Enable inline git blame via gitsigns
+  {
+    "lewis6991/gitsigns.nvim",
+    opts = {
+      current_line_blame = true,
+      current_line_blame_opts = {
+        virt_text = true,
+        virt_text_pos = "eol",
+        delay = 200,
+      },
+      current_line_blame_formatter = " <author>, <author_time:%Y-%m-%d> • <summary>",
     },
   },
 
