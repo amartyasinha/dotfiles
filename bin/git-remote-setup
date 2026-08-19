@@ -4,10 +4,13 @@ set -euo pipefail
 usage() {
     cat <<'EOF'
 Usage:
-  git-remote-setup <github-owner> <remote-name> [repo-dir]
+  git-remote-setup <github-owner> <remote-name> [repo-dir] [--fork]
 
 Description:
   Helper to quickly set up and maintain multiple git remotes (e.g. fork/origin + upstream).
+
+Options:
+  --fork         Create a fork using gh CLI before setting up remotes (origin mode only).
 
 Arguments:
   github-owner   GitHub user/org to use for the selected remote URL.
@@ -25,6 +28,9 @@ Examples:
   # Cloned from original; switch origin to your fork and keep original as upstream
   git-remote-setup amartyasinha origin /path/to/repo
 
+  # Cloned from original; create fork and switch origin to it
+  git-remote-setup amartyasinha origin --fork
+
   # Add/update another remote name
   git-remote-setup openstack-k8s-operators source
 EOF
@@ -35,14 +41,28 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     exit 0
 fi
 
-if [[ $# -lt 2 || $# -gt 3 ]]; then
+# Extract flags and positional arguments
+fork_flag=false
+positional_args=()
+for arg in "$@"; do
+    case "$arg" in
+        --fork)
+            fork_flag=true
+            ;;
+        *)
+            positional_args+=("$arg")
+            ;;
+    esac
+done
+
+if [[ ${#positional_args[@]} -lt 2 || ${#positional_args[@]} -gt 3 ]]; then
     usage
     exit 1
 fi
 
-github_owner="$1"
-remote_name="$2"
-repo_dir="${3:-.}"
+github_owner="${positional_args[0]}"
+remote_name="${positional_args[1]}"
+repo_dir="${positional_args[2]:-.}"
 
 if [[ ! -d "$repo_dir" ]]; then
     echo "Error: repo-dir not found: $repo_dir" >&2
@@ -105,6 +125,23 @@ set_remote_url() {
         git remote add "$name" "$url"
     fi
 }
+
+if [[ "$fork_flag" == true ]]; then
+    if [[ "$remote_name" != "origin" ]]; then
+        echo "Error: --fork flag only works with 'origin' remote mode" >&2
+        exit 1
+    fi
+    if ! command -v gh >/dev/null 2>&1; then
+        echo "Error: gh CLI not found. Install it from https://cli.github.com/" >&2
+        exit 1
+    fi
+    echo "Creating fork using gh CLI..."
+    if ! gh repo fork --remote=false --clone=false; then
+        echo "Error: failed to create fork" >&2
+        exit 1
+    fi
+    echo "Fork created successfully."
+fi
 
 if [[ "$remote_name" == "origin" ]]; then
     # In origin mode, protect existing upstream. Bootstrap only if missing.
